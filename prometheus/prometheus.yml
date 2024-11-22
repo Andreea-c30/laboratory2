@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s # Default scrape interval
+
+scrape_configs:
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway:3000','animal_posts_service:8000','new_chat:9100']  # Ensure this matches your service name and exposed port

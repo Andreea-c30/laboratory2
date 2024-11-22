@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  animal_posts_service:
+    image: animal_posts_service_image
+    build:
+      context: ./animal_posts_service
+    expose:
+      - "50052"  
+      - "8000" # Exposing the port internally but not binding to a host port directly
+    environment:
+      - DATABASE_URL=sqlite:///animal_posts.db
+    volumes:
+      - animal_posts_data:/app/animal_posts.db
+    deploy:
+      replicas: 3  # Running 3 replicas of animal_posts_service
+
+
+  gateway:
+    image: gateway_image
+    build:
+      context: ./gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - SERVICE_DISCOVERY_URL=http://service_discovery:3001
+      - CHAT_WS_URL=ws://new_chat:6789 
+      - ANIMAL_SERVICE_URL=http://animal_posts_service:50052 
+    depends_on:
+      - service_discovery
+      - animal_posts_service
+      - new_chat  
+
+
+  new_chat:
+    build:
+      context: ./new_chat
+    ports:
+      - "6789"
+      - "9100"
+    environment:
+      - DATABASE_URL=mongodb://mongo:27017/
+
+    depends_on:
+      - service_discovery
+      - mongo
+
+
+  service_discovery:
+    build:
+      context: ./service_discovery
+    ports:
+      - "3001:3001"
+
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/chat_db.db
+
+
+
+  prometheus:
+    image: prom/prometheus:v2.20.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - 9090:9090
+    expose:
+      - 9090
+
+  grafana:
+    image: grafana/grafana:7.1.5
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SERVER_HTTP_PORT=3002
+    ports:
+      - 3002:3002
+    expose:
+      - 3002
+
+volumes:
+  animal_posts_data:
+  mongo_data:
+  grafana_data: 
+  prometheus_data:
+
+
+networks:
+  app_network:
+
